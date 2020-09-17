@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Binary classification with TensorFlow.js</title>
+    <!-- Import TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.0.0/dist/tf.min.js"></script>
+    <!-- Import tfjs-vis -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis@1.0.2/dist/tfjs-vis.umd.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+
+</head>
+
+<body>
+
+    <script type="text/javascript">
+        async function plotClasses(pointsArray, classKey, size = 400) {
+            const allSeries = {};
+            //add each class as a series
+            pointsArray.forEach(p => {
+                //add each point to the series for the class
+                const seriesName = `${classKey}: ${p.class}`;
+                let series = allSeries[seriesName];
+                if (!series) {
+                    series = [];
+                    allSeries[seriesName] = series;
+                }
+                series.push(p);
+            });
+
+            tfvis.render.scatterplot({
+                name: `cheat vs axis`,
+                styles: { width: "100%" }
+            },
+                {
+                    values: Object.values(allSeries),
+                    series: Object.keys(allSeries),
+                },
+                {
+                    xLabel: "X",
+                    yLabel: "Y",
+                    height: size,
+                    width: size * 1.5,
+                }
+
+            )
+        }
+
+        function normalise(tensor, previousMin = null, previousMax = null) {
+            const min = previousMin || tensor.min();
+            console.log("tensor min for normalised is :" + tensor.min());
+            const max = previousMax || tensor.max();
+            console.log("tensor max for normalised is :" + tensor.max());
+
+
+            const normalisedTensor = tensor.sub(min).div(max.sub(min));
+            return {
+                tensor: normalisedTensor,
+                min,
+                max
+            };
+        }
+        function denormalise(tensor, min, max) {
+            console.log("tensor min for denormalised is :" + min);
+            console.log("tensor max for denormalised is :" + max);
+            const denormalisedTensor = tensor.mul(max.sub(min)).add(min);
+            return denormalisedTensor;
+        }
+
+        let model;
+        function createModel() {
+            model = tf.sequential();
+            model.add(tf.layers.dense({ inputShape: [17], activation: "sigmoid", units: 1 }));
+            //  model.add(tf.layers.dense({ activation: "relu", units: 1 }));
+            model.compile({ loss: 'binaryCrossentropy', optimizer: tf.train.adam(0.8), metrics: ['accuracy'] });
+            console.log("doing....compiling on line 41XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+            model.weights.forEach(w => {
+                console.log(w.name, w.shape);
+            });
+            return model;
+        }
+
+        async function trainModel(model, trainingFeatureTensor, trainingLabelTensor) {
+
+            const { onBatchEnd, onEpochEnd } = tfvis.show.fitCallbacks(
+                { name: "Training Performance" },
+                ['loss']
+            )
+            return model.fit(trainingFeatureTensor, trainingLabelTensor, {
+                batchSize: 64,
+                epochs: 1,
+                validationSplit: 0.2,
+                callbacks: {
+                    onEpochEnd,
+                    onBatchEnd,
+
+                    onEpochEnd: async (epoch, logs) => {
+                        console.log("Epoch: " + epoch + " Loss: " + logs.loss + " Accuracy: " + logs.acc);
+                        console.log("validation loss: " + logs.val_loss);
+                    },
+                    onEpochBegin: async function () {
+                        //  await plotPredictionLine();
+                        const layer = model.getLayer(undefined, 0);
+                        tfvis.show.layer({ name: "Layer 1" }, layer);
+                    }
+                },
+
+            });
+
+        }
+
+        let pointsPredict;
+        let inputTensor, normalisedInput, outPutCheck, outputValue = [];
+        const cheatArray = [];
+        async function predict() {
+            // model = await trainModel(model, trainingFeatureTensor, trainingLabelTensor);
+            const predictData = tf.data.csv("https://laurencefay.com/examdetector/data/46data.csv");
+            //push elements to an array
+            console.log(predictData + "is predictData");
+            await predictData.forEachAsync(e => cheatArray.push(e));
+            // Extract x and y values to plot
+            predictPointsDataset = cheatArray.map(record => ({
+                x: record.NTX,
+                x1: record.NTY,
+                x2: record.NTZ,
+                x3: record.LCX,
+                x4: record.LCY,
+                x5: record.LCZ,
+                x6: record.RCX,
+                x7: record.RCY,
+                x8: record.RCZ,
+                x9: record.MEX,
+                x10: record.MEY,
+                x11: record.MEZ,
+                x12: record.Faces,
+                x13: record.Dir,
+                x14: record.VisCount,
+                x15: record.FirstObj,
+                x16: record.SecondObj,
+
+            }));
+
+            pointsPredict = await predictPointsDataset;
+            //   tf.tidy(() => {
+
+
+            const featureValuesPredict = pointsPredict.map(p => [p.x, p.x1, p.x2, p.x3, p.x4, p.x5, p.x6,
+            p.x7, p.x8, p.x9, p.x10, p.x11, p.x12, p.x13, p.x14, p.x15, p.x16]);
+
+
+
+            const inputTensor = tf.tensor(featureValuesPredict);
+
+            console.log(inputTensor + "This is line 159 - inputTensor");
+
+            const normalisedInput = normalise(inputTensor, normalisedFeature.min, normalisedFeature.max);
+            console.log(normalisedFeature.min + " : is the normalised F min");
+            console.log(normalisedFeature.max + " : is the normalised F max");
+
+            console.log(normalisedInput.tensor + "this is the normalised input on line 164");
+            const outPutCheck = model.predict(normalisedInput.tensor);
+            console.log(outPutCheck + ": this is the output on line 164");
+            const outputTensor = denormalise(outPutCheck, normalisedLabel.min, normalisedLabel.max);
+            console.log(normalisedLabel.min + " : is the normalised L min");
+            console.log(normalisedLabel.max + " : is the normalised L max");
+
+
+            let outputFloat = outputTensor.dataSync();
+            console.log(outputFloat);
+            console.log(outputFloat.length + "is the float length");
+
+
+            let arrayOutput = [];
+            for (let i = 0; i < outputFloat.length; i++) {
+                arrayOutput.push(outputFloat[i]);
+            }
+
+            console.log(arrayOutput + "is arrayOutput after push")
+            //Work out the sum of the numbers in
+            //our array
+            let totalSum = 0;
+            for (let i = 0; i < arrayOutput.length; i++) {
+                totalSum += arrayOutput[i];
+            }
+
+            console.log(totalSum + ": is total sum")
+            //Work out how many numbers are
+            //in our array.
+            let sumCount = arrayOutput.length;
+
+            console.log(sumCount + ": is length")
+            //Finally, get the average.
+            let ave = totalSum / sumCount;
+            averagePercent = ave.toFixed(2) * 100;
+            //Print the median / average to the console.
+            //In this case, the average is 7.
+            console.log("Prediction on cheating is: " + averagePercent + "%");
+
+            document.getElementById("prediction-output").innerHTML = `The predicted % of the likely hood of cheating is <br>`
+                + `<span style="font-size: 2em">${averagePercent}\%</span>`;
+        };
+
+
+
+        /*     async function load() {
+              const storageKey = `localstorage://${storageID}`;
+              const models = await tf.io.listModels();
+              const modelInfo = models[storageKey];
+              if (modelInfo) {
+                model = await tf.loadLayersModel(storageKey);
+        
+                tfvis.show.modelSummary({ name: "Model summary" }, model);
+                const layer = model.getLayer(undefined, 0);
+                tfvis.show.layer({ name: "Layer 1" }, layer);
+        
+                //  await plotPredictionLine();
+        
+                document.getElementById("model-status").innerHTML = `Trained (saved ${modelInfo.dateSaved})`;
+                document.getElementById("predict-button").removeAttribute("disabled");
+              }
+              else {
+                alert("Could not load: no saved model found");
+              }
+            } */
+
+        async function test() {
+            const lossTensor = model.evaluate(testingFeatureTensor, testingLabelTensor);
+            console.log(lossTensor);
+            const loss = await lossTensor.dataSync();
+            console.log(`Testing Loss: ${loss}`);
+
+            //  document.getElementById("testing-status").innerHTML = `Testing set loss: ${loss.toPrecision(5)}`;
+        }
+
+        const storageID = "examDetectorModel";
+        async function save() {
+            const saveResults = await model.save(`downloads://${storageID}`);
+
+            document.getElementById("model-status").innerHTML = `Trained (saved ${saveResults.modelArtifactsInfo.dateSaved})`;
+
+
+        }
+
+        function downloadJ() {
+
+            let values = {
+                normalisedFeature
+            }
+            let json = JSON.stringify(values);
+            //Convert JSON string to BLOB.
+            json = [json];
+            let blob1 = new Blob(json, { data:"text/json;charset=utf-8" }); 
+            
+
+            let url = window.URL || window.webkitURL;
+            link = url.createObjectURL(blob1);
+            let a = document.createElement("a");
+            a.download = "tValues.json";
+            a.href = link;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+
+
+        async function train() {
+            ["train", "test", "predict", "save"].forEach(id => {
+                document.getElementById(`${id}-button`).setAttribute("disabled", "disabled");
+            });
+            document.getElementById("model-status").innerHTML = "Training...";
+
+            const model = createModel();
+            tfvis.show.modelSummary({ name: "Model summary" }, model);
+            const layer = model.getLayer(undefined, 0);
+            tfvis.show.layer({ name: "Layer 1" }, layer);
+            // await plotPredictionLine();
+
+
+            const result = await trainModel(model, trainingFeatureTensor, trainingLabelTensor);
+            console.log(result);
+            const trainingLoss = result.history.loss.pop();
+            console.log(`Training set loss: ${trainingLoss}`);
+            const validationLoss = result.history.val_loss.pop();
+            console.log(`Validation set loss: ${validationLoss}`);
+
+
+
+            document.getElementById("model-status").innerHTML = "Trained (unsaved)\n"
+                + `Loss: ${trainingLoss.toPrecision(5)}\n`
+                + `Validation loss: ${validationLoss.toPrecision(5)}`;
+            document.getElementById("test-button").removeAttribute("disabled");
+            document.getElementById("save-button").removeAttribute("disabled");
+            document.getElementById("predict-button").removeAttribute("disabled");
+        }
+        async function plotParams(weight, bias) {
+            model.getLayer(null, 0).setWeights([
+                tf.tensor2d([[weight]]), // Kernel (input multiplier)
+                tf.tensor1d([bias]), // Bias
+            ])
+            //  await plotPredictionLine();
+            const layer = model.getLayer(undefined, 0);
+            tfvis.show.layer({ name: "Layer 1" }, layer);
+        }
+
+
+        let points;
+        let normalisedFeature, normalisedLabel;
+        let trainingFeatureTensor, testingFeatureTensor, trainingLabelTensor, testingLabelTensor, dataHomeArray = [];
+
+        async function run() {
+            // Import from CSV
+            const examDataset = tf.data.csv("https://laurencefay.com/examdetector/data/cheatDataCleanedTenTh.csv");
+            //push elements to an array
+            await examDataset.forEachAsync(e => dataHomeArray.push(e));
+            // Extract x and y values to plot
+            pointsDataset = dataHomeArray.map(record => ({
+                x: record.NTX,
+                x1: record.NTY,
+                x2: record.NTZ,
+                x3: record.LCX,
+                x4: record.LCY,
+                x5: record.LCZ,
+                x6: record.RCX,
+                x7: record.RCY,
+                x8: record.RCZ,
+                x9: record.MEX,
+                x10: record.MEY,
+                x11: record.MEZ,
+                x12: record.Faces,
+                x13: record.Dir,
+                x14: record.VisCount,
+                x15: record.FirstObj,
+                x16: record.SecondObj,
+
+                class: record.Cheat,
+
+            }));
+
+            console.log(pointsDataset + 'pointsDataset array');
+            points = await pointsDataset;
+            if (points.length % 2 !== 0) { // If odd number of elements
+                points.pop(); // remove one element
+            }
+            tf.util.shuffle(points);
+            console.log(points.length + "is points length");
+            console.log(points + "is points on line 314")
+            plotClasses(points, "Cheat");
+
+            // Extract Features (inputs)
+            const featureValues = points.map(p => [p.x, p.x1, p.x2, p.x3, p.x4, p.x5, p.x6,
+            p.x7, p.x8, p.x9, p.x10, p.x11, p.x12, p.x13, p.x14, p.x15, p.x16]);
+            console.log('featurevalues line 309: ' + featureValues.length);
+            console.log(featureValues);
+
+            const featureTensor = tf.tensor(featureValues, [(featureValues.length), 17]);
+            console.log(featureTensor + ': is feature tensorXXXXXXXXX on line 313');
+            console.log(featureTensor.shape + ': is feature tensor on line 313');
+            // Extract Labels (outputs)
+
+            const labelValues = points.map(p => p.class);
+            const labelTensor = tf.tensor(labelValues, [labelValues.length, 1]);
+
+            featureTensor.print();
+            labelTensor.print();
+
+            // Normalise features and labels
+            normalisedFeature = normalise(featureTensor);
+            normalisedLabel = normalise(labelTensor);
+            featureTensor.dispose();
+            labelTensor.dispose();
+            console.log(normalisedFeature.tensor + 'is normalisedFeature.tensor on line 323');
+            console.log(normalisedFeature.tensor.shape + 'is normalisedFeature.tensor on line 323');
+
+            console.dir('dir: ' + normalisedFeature.tensor, { 'maxArrayLength': null });
+
+            [trainingFeatureTensor, testingFeatureTensor] = tf.split(normalisedFeature.tensor, 2);
+            [trainingLabelTensor, testingLabelTensor] = tf.split(normalisedLabel.tensor, 2);
+            console.log(trainingFeatureTensor.shape + 'is trainingFeatureTensor.shape on line 326');
+
+            document.getElementById("model-status").innerHTML = "No model trained";
+            document.getElementById("train-button").removeAttribute("disabled");
+            // document.getElementById("load-button").removeAttribute("disabled");
+
+
+
+
+        }
+
+        async function toggleVisor() {
+            tfvis.visor().toggle();
+        }
+        run();
+
+
+
+    </script>
+
+    <!--   Header   -->
+    <div class="section no-pad-bot" id="index-banner">
+        <div class="container">
+            <h5 class="header center blue-text small">Binary classification with TensorFlow.js</h5>
+            <div class="row center">
+                <h6 class="header col s12 light">Train a model to predict a class.</h6>
+            </div>
+        </div>
+    </div>
+
+    <!--   Misc buttons   -->
+    <div class="section no-pad-bot light-blue lighten-4">
+        <div class="container">
+            <div class="row center">
+                <button id="toggle-button" class="waves-effect waves-light light-blue btn-small"
+                    onclick="toggleVisor()">Toggle
+                    Visor</button>
+                <br /><br />
+            </div>
+        </div>
+    </div>
+
+    <!--   Main functionality   -->
+    <div class="container">
+        <div class="section">
+
+            <div class="row">
+                <!--   Training   -->
+                <div class="col s12 m6">
+                    <div class="icon-block">
+                        <h3 class="center light-blue-text"><i class="material-icons" style="font-size: 2em">build</i>
+                        </h3>
+                        <h5 class="center">Train & Test</h5>
+
+                        <p class="light"></p>
+
+                        <div>
+                            <p><label>Training status:</label></p>
+                            <pre class="grey lighten-4"
+                                style="overflow-x: auto"><em id="model-status">Loading data...</em></pre>
+
+                            <p><label>Testing status:</label></p>
+                            <pre class="grey lighten-4"
+                                style="overflow-x: auto"><em id="testing-status">Not yet tested</em></pre>
+
+                            <button autocomplete="off" id="train-button" class="waves-effect light-blue waves-light btn"
+                                disabled onclick="train()">Train New Model</button>
+                            <button autocomplete="off" id="test-button" class="waves-effect light-blue waves-light btn"
+                                disabled onclick="test()">Test Model</button>
+                        </div>
+                        <br />
+
+                        <div>
+                            <!-- button autocomplete="off" id="load-button" class="waves-effect light-blue waves-light btn-small"
+                disabled onclick="load()">Load Model</button> -->
+                            <button autocomplete="off" id="save-button"
+                                class="waves-effect light-blue waves-light btn-small" disabled
+                                onclick="downloadJ();save()">Save Model</button>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!--   Prediction   -->
+                <div class="col s12 m6">
+                    <div class="icon-block">
+                        <h3 class="center light-blue-text"><i class="material-icons" style="font-size: 2em">timeline</i>
+                        </h3>
+                        <h5 class="center">Predict</h5>
+
+
+                        <button autocomplete="off" id="predict-button" class="waves-effect light-green waves-light btn"
+                            disabled onclick="predict()">Predict exam cheaters </button>
+                        <p><strong id="prediction-output"></strong></p>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+
+</html>
