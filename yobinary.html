@@ -115,7 +115,7 @@
         const cheatArray = [];
         async function predict() {
             // model = await trainModel(model, trainingFeatureTensor, trainingLabelTensor);
-            const predictData = tf.data.csv("https://laurencefay.com/examdetector/data/46data.csv");
+            const predictData = tf.data.csv("./46data.csv");
             //push elements to an array
             console.log(predictData + "is predictData");
             await predictData.forEachAsync(e => cheatArray.push(e));
@@ -311,7 +311,7 @@
 
         async function run() {
             // Import from CSV
-            const examDataset = tf.data.csv("https://laurencefay.com/examdetector/data/cheatDataCleanedTenTh.csv");
+            const examDataset = tf.data.csv("./cheatDataCleanedTenTh.csv");
             //push elements to an array
             await examDataset.forEachAsync(e => dataHomeArray.push(e));
             // Extract x and y values to plot
